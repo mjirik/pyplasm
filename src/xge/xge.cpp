@@ -51,7 +51,10 @@ void XgeModule::init()
     Log::printf("XgeModule::init_step3\n");
     app->initialiseApp("dummy");
     Log::printf("XgeModule::init_step4\n");
+#if !PYPLASM_TRAVIS
+// canvas cause fail on travis-ci
     GLCanvas::setShared(SmartPointer<GLCanvas>(new GLCanvas));
+#endif
     Log::printf("XgeModule::init_finished\n");
   }
 }

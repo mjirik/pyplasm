@@ -24,6 +24,11 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
 ####################################################
 # platform
 ####################################################
+IF(TRAVIS)
+  SET(PYPLASM_TRAVIS 1)
+  ADD_DEFINITIONS(-DPYPLASM_TRAVIS=1)
+ENDIF()
+
 IF (WIN32)
 
   SET(PYPLASM_WINDOWS 1)
