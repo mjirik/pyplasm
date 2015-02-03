@@ -44,10 +44,15 @@ void XgeModule::init()
 #endif
 
     juce::initialiseJuce_GUI();
+    Log::printf("XgeModule::init_step1\n");
     juce::JUCEApplication::createInstance = (juce::JUCEApplication::CreateInstanceFunction)-1;//need not to be 0 
+    Log::printf("XgeModule::init_step2\n");
     app=SmartPointer<XgeApplication>(new XgeApplication());
+    Log::printf("XgeModule::init_step3\n");
     app->initialiseApp("dummy");
+    Log::printf("XgeModule::init_step4\n");
     GLCanvas::setShared(SmartPointer<GLCanvas>(new GLCanvas));
+    Log::printf("XgeModule::init_finished\n");
   }
 }
 
