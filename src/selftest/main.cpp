@@ -2830,7 +2830,7 @@ public:
 		SmartPointer<Batch> batch(new Batch);
 		batch->primitive=Batch::QUADS;
 		batch->setColor(Color4f(1,1,1));
-		float _vertices[]       = {0,0,0,  W,0,0,  W,H,0, 0,H,0};batch->vertices.reset(new Array(12,_vertices));
+		float _vertices[]       = {static_cast<float>(0},static_cast<float>(0),static_cast<float>(0), static_cast<float>(W),static_cast<float>(0),static_cast<float>(0),  static_cast<float>(W),static_cast<float>(H),static_cast<float>(0), static_cast<float>(0),static_cast<float>(H),static_cast<float>(0)};batch->vertices.reset(new Array(12,_vertices));
 		batch->texture0=texture0;
 		batch->texture1=texture1;
 		float _texture0coords[] ={0,0, 1,0, 1,1, 0,1};batch->texture0coords.reset(new Array(8,_texture0coords));
