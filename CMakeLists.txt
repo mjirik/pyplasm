@@ -63,10 +63,26 @@ ELSE()
   ADD_DEFINITIONS(-D_FILE_OFFSET_BITS=64)
   SET(CMAKE_C_FLAGS    ${CMAKE_C_FLAGS}   "-fPIC")
   SET(CMAKE_CXX_FLAGS  ${CMAKE_CXX_FLAGS} "-fPIC -std=gnu++0x")
-  FIND_PACKAGE(NumPy REQUIRED)
+
+
+  set (python_cmd "python")
+  set (python_arg "npi.py")
+  message(STATUS "cmd: ${python_cmd}")
+  execute_process(COMMAND ${git_cmd} ${python_arg}
+  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+  RESULT_VARIABLE python_result
+  OUTPUT_VARIABLE np_include_dir)
+
+  message(STATUS "git ver[${python_result}]: ${np_include_dir}")
+
+
+
+  FIND_PACKAGE(NumPy)
   INCLUDE_DIRECTORIES("/usr/local/include")
   INCLUDE_DIRECTORIES("/usr/include")
   INCLUDE_DIRECTORIES(${NUMPY_INCLUDE_DIRS})
+  INCLUDE_DIRECTORIES(${np_include_dir})
+
 
 ENDIF()
 
