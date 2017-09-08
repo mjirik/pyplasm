@@ -11,7 +11,7 @@ MESSAGE("-- PYTHON_EXECUTABLE: ${PYTHON_EXECUTABLE}")
 
 # find site package dir
 EXECUTE_PROCESS(COMMAND ${PYTHON_EXECUTABLE} -c 
-  "from distutils.sysconfig import get_python_lib; print get_python_lib()" 
+  "from distutils.sysconfig import get_python_lib; print(get_python_lib())"
   OUTPUT_VARIABLE PYTHON_SUGGESTED_SITE_PACKAGES_DIR OUTPUT_STRIP_TRAILING_WHITESPACE)
 SET(PYTHON_SITE_PACKAGES_DIR ${PYTHON_SUGGESTED_SITE_PACKAGES_DIR})
 
