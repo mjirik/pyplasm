@@ -1,8 +1,9 @@
 import sys
 import types
 import math
+from functools import reduce
 
-from hpc import *
+from .hpc import *
 
 PI = math.pi
 SIN = math.sin

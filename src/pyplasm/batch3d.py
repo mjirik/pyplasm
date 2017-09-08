@@ -7,6 +7,7 @@ from PyQt4.QtOpenGL import *
 
 from matrix import *
 from box    import *
+from functools import reduce
 
 # ////////////////////////////////////////////
 # GLVertexBuffer

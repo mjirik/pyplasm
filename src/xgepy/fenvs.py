@@ -1,9 +1,10 @@
 
 
 import time
+from functools import reduce
 
 start=time.clock()
-print "Evaluating fenvs.py.."
+print("Evaluating fenvs.py..")
 
 #default values (see PlasmConfig)
 DEFAULT_TOLERANCE=1e-6
@@ -234,9 +235,9 @@ if __name__ == "__main__":
 # ===================================================
 
 def COMP(Funs):
-   def compose(f,g):
-	  def h(x): return f(g(x))
-	  return h
+   def compose(f, g):
+      def h(x): return f(g(x))
+      return h
    return reduce(compose,Funs)
 
 
@@ -967,7 +968,7 @@ def PRINTPOL (obj):
 	return obj
 
 def PRINT(obj):
-	print obj
+	print(obj)
 	return obj
 
 
@@ -1240,15 +1241,15 @@ if __name__ == "__main__":
 # ===================================================
 # also ** can be used to indicates POWER
 # ===================================================
-def POWER (objs_list):
-	 
-	 if not isinstance(objs_list,list) or len(objs_list)!=2:
-		raise Exception("POWER can only be applied to a list of 2 arguments") 
+def POWER(objs_list):
 
-	 if ISNUM(objs_list[0]) and ISNUM(objs_list[1]):
-		return math.pow(objs_list[0], objs_list[1])
+    if not isinstance(objs_list, list) or len(objs_list)!=2:
+        raise Exception("POWER can only be applied to a list of 2 arguments")
 
-	 return Plasm.power(objs_list[0], objs_list[1])
+    if ISNUM(objs_list[0]) and ISNUM(objs_list[1]):
+        return math.pow(objs_list[0], objs_list[1])
+
+    return Plasm.power(objs_list[0], objs_list[1])
 		
 if __name__ == "__main__": 
 	assert(POWER([2,2])==4)
@@ -1599,7 +1600,7 @@ def GMAP(fun):
 			g.embed(vmat.dim)
 			g.transform(vmat,hmat)
 			pointdim = g.getPointDim()
-			print "Child",pointdim
+			print("Child", pointdim)
 				
 			for cell in cellsPerLevel(g,0):
 				point = [g.getVecf(cell)[i] for i in range(1,pointdim+1)]
@@ -2935,7 +2936,7 @@ def SEGMENT (sx):
 		P0=A
 		P1=[A[i]+(B[i]-A[i])*sx for i in range(N)]
 
-		print P0,P1
+		print(P0, P1)
 		return POLYLINE([P0,P1])
 	return SEGMENT0
 
@@ -3828,9 +3829,9 @@ def FLAT(hpc) :
     ret.append(temp.childs[I])
   return ret
 
-print "...fenvs.py imported in",(time.clock() - start),"seconds"
+print("...fenvs.py imported in",(time.clock() - start),"seconds")
 
 
 if __name__ == "__main__":
-  print "self test on fenvs ended"
+  print("self test on fenvs ended")
 
