@@ -1,153 +1,146 @@
 #include <xge/xge.h>
 #include <xge/glcanvas.h>
+#include "xge_gl.h"
 
 #if PYPLASM_APPLE
 #include <Carbon/Carbon.h>
 #endif
 
-#define DONT_SET_USING_JUCE_NAMESPACE 1
-#include <juce_2_0/juce.h>
+#include <sstream>
 
-#if PYPLASM_APPLE
-#include <OpenGL/GL.h>
-#include <OpenGL/GLU.h>
-#else
-#include <GL/gl.h>
-#include <GL/glu.h>
-#endif
-
-//missing OpenGL definitions
-#ifndef GL_CLAMP_TO_EDGE
-#define GL_CLAMP_TO_EDGE        0x812f
-#endif
-
-#ifndef GL_NUM_EXTENSIONS
-#define GL_NUM_EXTENSIONS       0x821d
-#endif
-
-#ifndef GL_BGRA_EXT
-#define GL_BGRA_EXT             0x80e1
-#endif
-
-#ifndef GL_DEPTH24_STENCIL8
-#define GL_DEPTH24_STENCIL8     0x88F0
-#endif
-
-#ifndef GL_RGBA8
-#define GL_RGBA8                GL_RGBA
-#endif
+#include <JUCE/AppConfig.h>
+#include <JUCE/modules/juce_opengl/juce_opengl.h>
 
 
-#ifndef GL_COLOR_ATTACHMENT0
-#define GL_COLOR_ATTACHMENT0    0x8CE0
-#endif
-
-#ifndef GL_DEPTH_ATTACHMENT
-#define GL_DEPTH_ATTACHMENT     0x8D00
-#endif
-
-#ifndef GL_FRAMEBUFFER
-#define GL_FRAMEBUFFER          0x8D40
-#endif
-
-#ifndef GL_FRAMEBUFFER_BINDING
-#define GL_FRAMEBUFFER_BINDING  0x8CA6
-#endif
-
-#ifndef GL_FRAMEBUFFER_COMPLETE
-#define GL_FRAMEBUFFER_COMPLETE 0x8CD5
-#endif
-
-#ifndef GL_RENDERBUFFER
-#define GL_RENDERBUFFER         0x8D41
-#endif
-
-#ifndef GL_RENDERBUFFER_DEPTH_SIZE
-#define GL_RENDERBUFFER_DEPTH_SIZE  0x8D54
-#endif
-
-#ifndef GL_STENCIL_ATTACHMENT
-#define GL_STENCIL_ATTACHMENT   0x8D20
-#endif
-
-#ifndef GL_WRITE_ONLY
-#define GL_WRITE_ONLY                 0x88B9
-#endif
-
-#if PYPLASM_WINDOWS
-enum
+/////////////////////////////////////////////////////////////////////////////
+class GLCanvas::Pimpl :  
+  public juce::Component , 
+  public juce::OpenGLRenderer,
+  public juce::OpenGLContext
 {
-  GL_OPERAND0_RGB                 = 0x8590,
-  GL_OPERAND1_RGB                 = 0x8591,
-  GL_OPERAND0_ALPHA               = 0x8598,
-  GL_OPERAND1_ALPHA               = 0x8599,
-  GL_SRC0_RGB                     = 0x8580,
-  GL_SRC1_RGB                     = 0x8581,
-  GL_SRC0_ALPHA                   = 0x8588,
-  GL_SRC1_ALPHA                   = 0x8589,
-  GL_TEXTURE0                     = 0x84C0,
-  GL_TEXTURE1                     = 0x84C1,
-  GL_TEXTURE2                     = 0x84C2,
-  GL_COMBINE                      = 0x8570,
-  GL_COMBINE_RGB                  = 0x8571,
-  GL_COMBINE_ALPHA                = 0x8572,
-  GL_PREVIOUS                     = 0x8578,
-  GL_COMPILE_STATUS               = 0x8B81,
-  GL_LINK_STATUS                  = 0x8B82,
-  GL_SHADING_LANGUAGE_VERSION     = 0x8B8C,
-  GL_FRAGMENT_SHADER              = 0x8B30,
-  GL_VERTEX_SHADER                = 0x8B31,
-  GL_ARRAY_BUFFER                 = 0x8892,
-  GL_ELEMENT_ARRAY_BUFFER         = 0x8893,
-  GL_STATIC_DRAW                  = 0x88E4,
-  GL_DYNAMIC_DRAW                 = 0x88E8
-};
-#endif
+public:
 
-
-SmartPointer<GLCanvas> GLCanvas::gl_shared;
-GLCanvas*              GLCanvas::gl_current=0;
-
-
-//////////////////////////////////////////////////////////////////////////////////////////////////////
-class GLCanvas::Native : 
-  public juce::DocumentWindow,
-  public juce::Timer
-{
-protected:
-
- 
-  //GLComponent
-  class GLComponent  : public juce::OpenGLComponent
+  //__________________________________________________________
+  class OwnedWindow : public juce::DocumentWindow
   {
   public:
 
-    typedef juce::OpenGLComponent JuceClass;
-
-    GLCanvas*             owner;
+    GLCanvas* owner;
 
     //constructor
-    GLComponent() :owner(0)
+    OwnedWindow(GLCanvas* owner_,juce::String title,juce::Colour background_color,int requiredButtons,bool addToDesktop) 
+      : owner(owner_),juce::DocumentWindow(title,juce::Colours::white,requiredButtons,addToDesktop)
     {
-      setPixelFormat(juce::OpenGLPixelFormat(8,8,16,0));
-      if (gl_shared)
-      {
-        this->setWantsKeyboardFocus(true);
-        this->shareWith(gl_shared->getNative()->getContext());
-        this->updateContext();
-      } 
-      setSize(1,1);
+      setUsingNativeTitleBar(true);
+      setResizable (true,true);
     }
 
     //destructor
-    ~GLComponent()
-      {}
+    virtual ~OwnedWindow()
+    {}
 
-    //newOpenGLContextCreated
-    virtual void newOpenGLContextCreated()
+    //closeButtonPressed
+    virtual void closeButtonPressed() override
+    {if (owner) owner->close();}
+
+  };
+
+  GLCanvas*    owner;
+  OwnedWindow* owned_win;
+
+  //constructor
+  Pimpl(GLCanvas* owner_) : owned_win(nullptr),owner(owner_)
+  {
+    bPyPlasmMainSharedContext=owner->isShared();
+    setPixelFormat(juce::OpenGLPixelFormat(8,8,16,0));
+
+    if (owner->isShared())
     {
-      juce::OpenGLContext* context=this->getContext();assert(context);
+      owned_win=new OwnedWindow(owner,"GLShared",juce::Colours::white,false,true);
+      attachTo(*owned_win);
+      owned_win->setSize(256,256);
+      owned_win->setVisible(true ); //force construction...
+      owned_win->setVisible(false); //... but I dont'want to see it (note: I made a modification in juce_OpenGLContext.cpp to not flush it)
+      assert(getRawContext()!=nullptr);
+    }
+    else
+    {
+      setWantsKeyboardFocus(true);
 
+      setComponentPaintingEnabled(false);
+      setContinuousRepainting(false);
+
+      //sharing...
+      void* raw_context=((juce::OpenGLContext*)GLCanvas::getShared()->getGLContext())->getRawContext(); assert(raw_context);
+      setNativeSharedContext(raw_context);
+      setRenderer(this);
+      attachTo(*this);
+
+      this->setSize(1024,768);
+
+      owned_win=new OwnedWindow(owner,"PyPlasm",juce::Colours::azure,juce::DocumentWindow::allButtons, true);
+      owned_win->setContentNonOwned(this,true);
+      owned_win->centreWithSize(1024,768);
+      owned_win->setVisible(true);
+      
+      //dont' have the bundle
+      #ifdef PYPLASM_APPLE
+      {
+        ProcessSerialNumber psn;
+        GetCurrentProcess(&psn);
+        TransformProcessType(&psn, kProcessTransformToForegroundApplication);
+        SetFrontProcess(&psn);
+      }
+      #endif
+    }
+    
+  }
+
+  //destructor
+  virtual ~Pimpl()
+  {
+    detach();
+    setRenderer(nullptr);
+    delete owned_win;
+  }
+
+  //makeCurrent
+  bool makeCurrent()
+  {assert(owner->isShared());return juce::OpenGLContext::makeActive();}
+
+  //doneCurrent
+  void doneCurrent()
+  {assert(owner->isShared());juce::OpenGLContext::deactivateCurrentContext();}
+
+  //getGLContext
+  juce::OpenGLContext* getGLContext()
+  {return (juce::OpenGLContext*)this;}
+
+private:
+
+  //newOpenGLContextCreated 
+  virtual void newOpenGLContextCreated() override
+  {}
+
+  //openGLContextClosing 
+  virtual void openGLContextClosing() override
+  {}
+
+  //renderOpenGL 
+  virtual void renderOpenGL() override
+  {
+    if (!owner)
+      return;
+    
+    assert(!owner->isShared());
+    
+    if (!isShowing() || !isActive()) 
+      return;
+
+    GLDestroyLater::flush(*owner);
+
+    
+    {
       glEnable(GL_LIGHTING);
       glEnable(GL_POINT_SMOOTH);
       glEnable(GL_DEPTH_TEST);
@@ -167,336 +160,159 @@ protected:
       glLightfv(GL_LIGHT0,GL_SPECULAR,white);
       glLightfv(GL_LIGHT0, GL_EMISSION, white);
 
-      context->extensions.glActiveTexture       (GL_TEXTURE1);
-      context->extensions.glClientActiveTexture (GL_TEXTURE1);
-      glTexParameteri       (GL_TEXTURE_2D , GL_TEXTURE_WRAP_S     ,GL_REPEAT);
-      glTexParameteri       (GL_TEXTURE_2D , GL_TEXTURE_WRAP_T     ,GL_REPEAT);
-      glTexParameterf       (GL_TEXTURE_2D , GL_TEXTURE_MAG_FILTER ,GL_LINEAR);
-      glTexEnvf             (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE   ,GL_MODULATE);
-      glTexParameteri       (GL_TEXTURE_2D  ,GL_TEXTURE_MIN_FILTER ,GL_NEAREST_MIPMAP_LINEAR);
+      this->extensions.glActiveTexture(GL_TEXTURE1);
+      glTexParameteri(GL_TEXTURE_2D , GL_TEXTURE_WRAP_S,GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D , GL_TEXTURE_WRAP_T,GL_REPEAT);
+      glTexParameterf(GL_TEXTURE_2D , GL_TEXTURE_MAG_FILTER ,GL_LINEAR);
+      glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE   ,GL_MODULATE);
+      glTexParameteri(GL_TEXTURE_2D  ,GL_TEXTURE_MIN_FILTER ,GL_NEAREST_MIPMAP_LINEAR);
 
-      context->extensions.glActiveTexture       (GL_TEXTURE0);
-      context->extensions.glClientActiveTexture (GL_TEXTURE0);
-      glTexParameteri       (GL_TEXTURE_2D , GL_TEXTURE_WRAP_S     ,GL_REPEAT);
-      glTexParameteri       (GL_TEXTURE_2D , GL_TEXTURE_WRAP_T     ,GL_REPEAT);
-      glTexParameterf       (GL_TEXTURE_2D , GL_TEXTURE_MAG_FILTER ,GL_LINEAR);
-      glTexEnvf             (GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE   ,GL_MODULATE);
-      glTexParameteri       (GL_TEXTURE_2D  ,GL_TEXTURE_MIN_FILTER ,GL_NEAREST_MIPMAP_LINEAR);
+      this->extensions.glActiveTexture(GL_TEXTURE0);
+      glTexParameteri(GL_TEXTURE_2D , GL_TEXTURE_WRAP_S,GL_REPEAT);
+      glTexParameteri(GL_TEXTURE_2D , GL_TEXTURE_WRAP_T,GL_REPEAT);
+      glTexParameterf(GL_TEXTURE_2D , GL_TEXTURE_MAG_FILTER ,GL_LINEAR);
+      glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE   ,GL_MODULATE);
+      glTexParameteri(GL_TEXTURE_2D  ,GL_TEXTURE_MIN_FILTER ,GL_NEAREST_MIPMAP_LINEAR);
+     
+      owner->renderOpenGL();
     }
-
-    //resized
-    virtual void resized()
-    {
-      JuceClass::resized();
-      if (!owner) return;  
-      owner->onResize(getWidth(),getHeight());
-    }
-
-    //visibilityChanged
-    virtual void visibilityChanged()
-    {
-      JuceClass::visibilityChanged();
-      if (!owner) return;
-      owner->onResize(getWidth(),getHeight());
-    }
-
-    //keyPressed
-    virtual bool keyPressed(const juce::KeyPress& key)
-    {	
-      JuceClass::keyPressed(key);
-      if (!owner) return false;
-      int code=key.getKeyCode();
-      if (code==juce::KeyPress::leftKey)  code=Keyboard::Key_Left ;
-      else if (code==juce::KeyPress::rightKey) code=Keyboard::Key_Right;
-      else if (code==juce::KeyPress::upKey)    code=Keyboard::Key_Up   ;
-      else if (code==juce::KeyPress::downKey)  code=Keyboard::Key_Down ; 
-      owner->onKeyboard(code,this->getMouseXYRelative().getX(),this->getMouseXYRelative().getY());
-      return false;
-    }
-
-    //mouseDown
-    virtual void mouseDown(const juce::MouseEvent& e)
-    {
-      JuceClass::mouseDown(e);
-      if (!owner) return;
-      int button;
-      if      (e.mods.isLeftButtonDown  ()) button=1;
-      else if (e.mods.isMiddleButtonDown()) button=2;
-      else if (e.mods.isRightButtonDown ()) button=3;
-      else return;
-      owner->onMouseDown(button,e.x,e.y);
-    }
-
-    //mouseMove
-    virtual void mouseMove(const juce::MouseEvent& e)
-    {
-      JuceClass::mouseMove(e);
-      if (!owner) return;
-      owner->onMouseMove(0,e.x,e.y);
-    }
-
-    //mouseDrag
-    virtual void mouseDrag(const juce::MouseEvent& e)
-    {
-      JuceClass::mouseDrag(e);
-      if (!owner) return;
-      int button;
-      if      (e.mods.isLeftButtonDown  ()) button=1;
-      else if (e.mods.isMiddleButtonDown()) button=2;
-      else if (e.mods.isRightButtonDown ()) button=3;
-      else return;
-      owner->onMouseMove(button,e.x,e.y);
-    }
-
-    //mouseUp
-    virtual void mouseUp(const juce::MouseEvent& e)
-    {
-      JuceClass::mouseUp(e);
-      if (!owner) return;
-      int button;
-      if      (e.mods.isLeftButtonDown  ()) button=1;
-      else if (e.mods.isMiddleButtonDown()) button=2;
-      else if (e.mods.isRightButtonDown ()) button=3;
-      else return;
-      owner->onMouseUp(button,e.x,e.y);
-    }
-
-    //mouseWheelMove
-    virtual void mouseWheelMove(const juce::MouseEvent& e, float wheelIncrementX,float wheelIncrementY)
-    {	
-      JuceClass::mouseWheelMove(e,wheelIncrementX,wheelIncrementY);
-      if (!owner) return;
-      owner->onMouseWheel(wheelIncrementY>0?120:-120);
-    }
-
-    //renderAndSwapBuffers
-    virtual bool renderAndSwapBuffers()
-      {return true;}
-
-    //renderOpenGL
-    virtual void renderOpenGL()
-      {}
-
-  };
-
-  GLCanvas*    owner;
-
-  //closeButtonPressed
-  virtual void closeButtonPressed()
-    {if (owner) owner->close();}
-
-  //timerCallback
-  virtual void timerCallback()
-    {if (owner) owner->onTimer();}
-
-public:
-
-  //constructor
-  Native(GLCanvas* owner) : owner(0) ,juce::DocumentWindow(gl_shared?"PyPlasm":"gl_shared",juce::Colours::azure,juce::DocumentWindow::allButtons, true) 
-  {
-    centreWithSize(1, 1);
-    setUsingNativeTitleBar(true);
-    setResizable (true,true);
-    GLComponent* glcomponent=new GLComponent();
-    setContentOwned(glcomponent,true);
-    setVisible(true);
-
-    if (!gl_shared)
-    {
-      glcomponent->updateContext(); //force creation
-      setVisible(false);      //avoid destruction
-    }
-    
-    //dont' have the bundle
-    #ifdef PYPLASM_APPLE
-    {
-      ProcessSerialNumber psn;
-      GetCurrentProcess(&psn);
-      TransformProcessType(&psn, kProcessTransformToForegroundApplication);
-      SetFrontProcess(&psn);
-    }
-    #endif
-
-
-    startTimer(30);
-
-    //now I unblock the events
-    this       ->owner = owner;
-    glcomponent->owner = owner;
   }
 
-  //destructor
-  ~Native()
-    {}
-
-  //getContext
-  inline juce::OpenGLContext* getContext()
-    {return dynamic_cast<GLComponent*>(this->getContentComponent())->getContext();}
-
-  //bind
-  inline bool bind()
+  //resized
+  virtual void resized() override
   {
-    assert(!gl_current);
+    juce::Component::resized();
+    if (!owner) return;  
+    owner->onResize(getWidth(),getHeight());
+  }
+
+  //visibilityChanged
+  virtual void visibilityChanged() override
+  {
+    juce::Component::visibilityChanged();
+    if (!owner) return;
+    owner->onResize(getWidth(),getHeight());
+  }
+
+  //keyPressed
+  virtual bool keyPressed(const juce::KeyPress& key) override
+  {	
+    juce::Component::keyPressed(key);
     if (!owner) return false;
-    GLComponent* glcomponent=dynamic_cast<GLComponent*>(this->getContentComponent());
-    glcomponent->updateContext();
-    glcomponent->getContextLock().enter();
-    bool bOk=glcomponent->makeCurrentContextActive();
-    if (!bOk) {glcomponent->getContextLock().exit(); return false;}
-    gl_current=owner;
-    return true;
+    int code=key.getKeyCode();
+    if (code==juce::KeyPress::leftKey)  code=Keyboard::Key_Left ;
+    else if (code==juce::KeyPress::rightKey) code=Keyboard::Key_Right;
+    else if (code==juce::KeyPress::upKey)    code=Keyboard::Key_Up   ;
+    else if (code==juce::KeyPress::downKey)  code=Keyboard::Key_Down ; 
+    owner->onKeyboard(code,this->getMouseXYRelative().getX(),this->getMouseXYRelative().getY());
+    return false;
   }
 
-  //unbind
-  inline bool unbind()
+  //mouseDown
+  virtual void mouseDown(const juce::MouseEvent& e) override
   {
-    assert(gl_current);
-    if (!owner) return false;
-    GLComponent* glcomponent=dynamic_cast<GLComponent*>(this->getContentComponent());
-    glcomponent->makeCurrentContextInactive();
-    glcomponent->getContextLock().exit();
-    gl_current=0;
-    return true;
+    juce::Component::mouseDown(e);
+    if (!owner) return;
+    int button;
+    if      (e.mods.isLeftButtonDown  ()) button=1;
+    else if (e.mods.isMiddleButtonDown()) button=2;
+    else if (e.mods.isRightButtonDown ()) button=3;
+    else return;
+    owner->onMouseDown(button,e.x,e.y);
   }
 
-  //swapBuffers
-  inline void swapBuffers()
+  //mouseMove
+  virtual void mouseMove(const juce::MouseEvent& e) override
   {
-    GLComponent* glcomponent=dynamic_cast<GLComponent*>(this->getContentComponent());
-    glcomponent->swapBuffers();
+    juce::Component::mouseMove(e);
+    if (!owner) return;
+    owner->onMouseMove(0,e.x,e.y);
   }
 
-   //NeedContext
-  class NeedContext
+  //mouseDrag
+  virtual void mouseDrag(const juce::MouseEvent& e) override
   {
-  public:
-
-    juce::OpenGLContext* context;
-    bool                 bUnbindShared;
-
-    //constructor
-    inline NeedContext() : bUnbindShared(false)
-    {
-      GLCanvas* glcanvas=GLCanvas::getCurrent();
-      if (!glcanvas)
-      {
-        bUnbindShared=true;
-        glcanvas=GLCanvas::getShared();
-        glcanvas->bind();
-      }
-      this->context=glcanvas->getNative()->getContext();;
-    }
-
-    //destructor
-    inline ~NeedContext()
-    {
-      if (bUnbindShared)
-        GLCanvas::getShared()->unbind();
-    }
-
-    //getContext
-    inline juce::OpenGLContext* getContext()
-      {return this->context;}
-
-  };
-
-
-  //createArrayBuffer
-  static void createArrayBuffer(SmartPointer<Array> array)
-  {
-    if (array->gpu)
-      return;
-
-    GLCanvas::Native::NeedContext bind_context;
-    juce::OpenGLContext* context=bind_context.getContext();
-
-    //can happen that meanwhile another thread has built the gpu
-    int   size=array->memsize();
-    void* data=(float*)array->c_ptr();
-
-    GLuint bufferid;	
-    context->extensions.glGenBuffers(1,&bufferid);XgeReleaseAssert(bufferid);
-    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, bufferid);
-    context->extensions.glBufferData(GL_ARRAY_BUFFER, size, 0, GL_STATIC_DRAW);
-
-    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, bufferid);
-    void* gpu_data = context->extensions.glMapBuffer(GL_ARRAY_BUFFER,GL_WRITE_ONLY);XgeReleaseAssert(gpu_data);
-    memcpy(gpu_data,data,size);
-    context->extensions.glUnmapBuffer(GL_ARRAY_BUFFER);
-    context->extensions.glBindBuffer(GL_ARRAY_BUFFER,0);
-
-    array->gpu=SmartPointer<Array::Gpu>(new Array::Gpu(bufferid));
+    juce::Component::mouseDrag(e);
+    if (!owner) return;
+    int button;
+    if      (e.mods.isLeftButtonDown  ()) button=1;
+    else if (e.mods.isMiddleButtonDown()) button=2;
+    else if (e.mods.isRightButtonDown ()) button=3;
+    else return;
+    owner->onMouseMove(button,e.x,e.y);
   }
 
-
-  //createTexture
-  static void createTexture(SmartPointer<Texture> texture)
+  //mouseUp
+  virtual void mouseUp(const juce::MouseEvent& e) override
   {
-    if (texture->gpu)
-      return;
-
-    GLCanvas::Native::NeedContext bind_context;
-    juce::OpenGLContext* context=bind_context.getContext();
-
-    unsigned int texid;
-    glGenTextures(1,&texid);XgeReleaseAssert(texid); 
-    glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
-    glBindTexture (GL_TEXTURE_2D, texid);
-    float maxsize;
-    glGetFloatv(GL_MAX_TEXTURE_SIZE,&maxsize); 
-    XgeDebugAssert (texture->width<=maxsize && texture->height<=maxsize);
-
-    unsigned int format=(texture->bpp==24)?GL_RGB:(texture->bpp==32?GL_RGBA:GL_LUMINANCE);
-    unsigned int type=GL_UNSIGNED_BYTE;
-
-    gluBuild2DMipmaps(GL_TEXTURE_2D,texture->bpp/8,texture->width, texture->height,format, type, texture->buffer);
-
-    texture->gpu=SmartPointer<Texture::Gpu>(new Texture::Gpu(texid));	
+    juce::Component::mouseUp(e);
+    if (!owner) return;
+    int button;
+    if      (e.mods.isLeftButtonDown  ()) button=1;
+    else if (e.mods.isMiddleButtonDown()) button=2;
+    else if (e.mods.isRightButtonDown ()) button=3;
+    else return;
+    owner->onMouseUp(button,e.x,e.y);
   }
 
-  //destroyArrayGpu
-  static void destroyArrayGpu(unsigned int id)
-  {
-    GLCanvas::Native::NeedContext bind_context;
-    juce::OpenGLContext* context=bind_context.getContext();
-    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, id);
-    context->extensions.glBufferData(GL_ARRAY_BUFFER, 0, 0, GL_STATIC_DRAW);
-    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, id);
-    context->extensions.glDeleteBuffers(1, &id);
+  //mouseWheelMove
+  virtual void mouseWheelMove(const juce::MouseEvent& e, const juce::MouseWheelDetails& details) override
+  {	
+    juce::Component::mouseWheelMove(e,details);
+    if (!owner) return;
+    owner->onMouseWheel(details.deltaY>0?120:-120);
   }
 
-  //destroyTextureGpu
-  static void destroyTextureGpu(unsigned int id)
-  {
-    GLCanvas::Native::NeedContext bind_context;
-    juce::OpenGLContext* context=bind_context.getContext();
-    glDeleteTextures(1,&id);
-  }
 
 };
 
+/////////////////////////////////////////////////////////////////////////
+static juce::CriticalSection                      destroy_later_lock;
+static std::vector< std::pair<int,unsigned int> > destroy_later_v;
 
-
-/////////////////////////////////////////////////////////////////////////////////////
-Array::Gpu::~Gpu()
+void GLDestroyLater::push_back(int type,unsigned int id)
 {
-  GLCanvas::Native::destroyArrayGpu(id);
+  destroy_later_lock.enter();
+  destroy_later_v.push_back(std::make_pair(type,id));
+  destroy_later_lock.exit();
 }
 
-/////////////////////////////////////////////////////////////////////////////////////
-Texture::Gpu::~Gpu()
+void GLDestroyLater::flush(GLCanvas& gl)
 {
-  GLCanvas::Native::destroyTextureGpu(id);
+  juce::OpenGLContext* context=(juce::OpenGLContext*)gl.getGLContext();
+  destroy_later_lock.enter();
+  {
+    for (int I=0;I<(int)destroy_later_v.size();I++)
+    {
+      int type=destroy_later_v[I].first;
+      unsigned int id=destroy_later_v[I].second;
+      switch(type)
+      {
+
+      case DestroyArrayBuffer:
+        context->extensions.glBindBuffer(GL_ARRAY_BUFFER, id);
+        context->extensions.glBufferData(GL_ARRAY_BUFFER, 0, 0, GL_STATIC_DRAW);
+        context->extensions.glBindBuffer(GL_ARRAY_BUFFER, id);
+        context->extensions.glDeleteBuffers(1, &id);
+        break;
+
+      case DestroyTexture:
+        glDeleteTextures(1,&id);
+        break;
+      }
+    }
+    destroy_later_v.clear();
+  }
+  destroy_later_lock.exit();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-GLCanvas::GLCanvas() : native(0)
+GLCanvas::GLCanvas() : pimpl(nullptr)
 {
-  this->native=new Native(this);
+  if (!getShared())
+    getShared()=this;
 
   this->bProgressiveRendering = true;
-  this->m_close               = false;
-  this->m_redisplay           = true;
   this->draw_lines            = false;
   this->draw_axis             = true;
   this->mouse_beginx          = 0;
@@ -505,66 +321,87 @@ GLCanvas::GLCanvas() : native(0)
   this->trackball_center      = Vec3f(0,0,0);
   this->frustum               = SmartPointer<Frustum>(new Frustum());
   this->m_fix_lighting        = false;
+  this->batch_line_width      = 1;
+
+  this->pimpl=new Pimpl(this);
 
   this->frustum->guessBestPosition(Box3f(Vec3f(-1,-1,-1),Vec3f(+1,+1,+1)));
-
-  native->centreWithSize(1024,768);
 }
 
 
 /////////////////////////////////////////////////////////////////////////////////////
 GLCanvas::~GLCanvas()
+{delete pimpl;}
+
+/////////////////////////////////////////////////////////////////////////
+void* GLCanvas::getGLContext()
+{return pimpl? pimpl->getGLContext() : nullptr;}
+
+
+/////////////////////////////////////////////////////////////////////////////////////
+void GLCanvas::redisplay()
 {
-  delete native;
+  frustum->refresh();
+  if (pimpl) pimpl->triggerRepaint();
 }
 
 /////////////////////////////////////////////////////////////////////////////////////
 void GLCanvas::setOctree(SmartPointer<Octree> octree)
 {
   this->octree=octree;
-  if (!octree) return;
-	this->trackball_center =this->octree->world_box.center();
-	this->frustum->guessBestPosition(this->octree->world_box);
+  Box3f world_box=getWorldBox();
+	this->trackball_center =world_box.center();
+	this->frustum->guessBestPosition(world_box);
   this->redisplay();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-bool GLCanvas::bind()
-{
-  return native->bind();
-}
+bool GLCanvas::makeCurrent()
+{return pimpl->makeCurrent();}
 
 ///////////////////////////////////////////////////////////////////////////////////////////
-bool GLCanvas::unbind()
-{
-  return native->unbind();
-}
-
-////////////////////////////////////////////////////////////
-void GLCanvas::swapBuffers()
-{
-  native->swapBuffers();
-}
+void GLCanvas::doneCurrent()
+{pimpl->doneCurrent();}
 
 
-///////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////////////////
+#if 1
+
+static bool bExitRunLoop=false;
+
 void GLCanvas::runLoop()
 {
-  while (!this->m_close && juce::MessageManager::getInstance()->runDispatchLoopUntil(100))
-    ;
+  bExitRunLoop=false;
+
+  while (!bExitRunLoop)
+    juce::MessageManager::getInstance()->runDispatchLoopUntil(200);
 }
 
-///////////////////////////////////////////////////////////////////////////////////////////
+void GLCanvas::close()
+{bExitRunLoop=true;}
+
+#else //this version does not work on linux
+
+void GLCanvas::runLoop()
+{
+  juce::MessageManager::getInstance()->runDispatchLoop();
+  juce::MessageManager::getInstance()->hasStopMessageBeenSent()=false;
+}
+
 void GLCanvas::close()
 {
-  m_close=true;
+  try
+  {juce::MessageManager::getInstance()->stopDispatchLoop();}
+  catch(...){}
 }
 
+#endif 
 
 ////////////////////////////////////////////////////////////
 void GLCanvas::setViewport(int x,int y,int width,int height)
 {
-  glViewport(x,y,width,height);
+  double scale=pimpl->getRenderingScale();
+  glViewport((int)(scale*x),(int)(scale*y),(int)(scale*width),(int)(scale*height));
 }
 
 ////////////////////////////////////////////////////////////
@@ -585,9 +422,7 @@ void GLCanvas::setModelviewMatrix(Mat4f mat)
 
 ////////////////////////////////////////////////////////////
 void GLCanvas::clearScreen(bool ClearColor,bool ClearDepth)
-{
-  glClear((ClearColor?GL_COLOR_BUFFER_BIT:0) | (ClearDepth?GL_DEPTH_BUFFER_BIT:0));
-}
+{glClear((ClearColor?GL_COLOR_BUFFER_BIT:0) | (ClearDepth?GL_DEPTH_BUFFER_BIT:0));}
 
 ////////////////////////////////////////////////////////////
 void GLCanvas::setDefaultLight(Vec3f pos,Vec3f dir)
@@ -772,6 +607,31 @@ bool GLCanvas::onKeyboard(int key,int x,int y)
     this->redisplay();
     return true;
 
+  case 'v':case 'V':
+    this->batch_line_width=std::max(0,this->batch_line_width-1);
+    this->redisplay();
+    return true;
+
+  case 'b':case 'B':
+    this->batch_line_width=std::max(0,this->batch_line_width+1);
+    this->redisplay();
+    return true;
+
+
+  case 'p': case 'P':
+  {
+	  std::cout<<"def MYVIEW(obj):"<<std::endl;
+    std::cout<<"  glcanvas=GLCanvas()"<<std::endl;
+    std::cout<<"  glcanvas.setOctree(Octree(Plasm.getBatches(obj)))"<<std::endl;
+    std::cout<<"  glcanvas.frustum.pos="<<frustum->pos.repr()<<std::endl;
+    std::cout<<"  glcanvas.frustum.dir="<<frustum->dir.repr()<<std::endl;
+    std::cout<<"  glcanvas.frustum.vup="<<frustum->vup.repr()<<std::endl;
+    std::cout<<"  glcanvas.redisplay()"<<std::endl;
+	  std::cout<<"  glcanvas.runLoop()"<<std::endl;
+    std::cout<<""<<std::endl;
+    return true;
+  }
+
   case 'F':case 'f':
     {
       if (!debug_frustum)
@@ -854,7 +714,6 @@ bool GLCanvas::onKeyboard(int key,int x,int y)
 
 
 ///////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////
 void GLCanvas::onMouseDown(int button,int x,int y)
 {
   mouse_beginx = x;
@@ -862,7 +721,6 @@ void GLCanvas::onMouseDown(int button,int x,int y)
 }
 
 
-///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 void GLCanvas::onMouseMove(int button,int x,int y)
 {
@@ -947,7 +805,6 @@ void GLCanvas::onMouseMove(int button,int x,int y)
 
 
 ///////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////
 void GLCanvas::onMouseUp(int button,int x,int y)
 {
   mouse_beginx = x;
@@ -956,24 +813,13 @@ void GLCanvas::onMouseUp(int button,int x,int y)
 
 
 ///////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////
 void GLCanvas::onMouseWheel(int delta)
 {
   frustum->pos+=(delta>0?+1:-1) * frustum->dir * frustum->walk_speed;
   this->redisplay();
 }
 
-///////////////////////////////////////////////////////////////////////////////
-void GLCanvas::onTimer()
-{
-  if (m_redisplay)
-  {
-    m_redisplay=false;
-    this->bind();
-    this->renderScene();
-    this->unbind();
-  }
-}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 void GLCanvas::onResize(int width,int height)
@@ -988,12 +834,11 @@ void GLCanvas::onResize(int width,int height)
 
   float zNear=0.001f;
   float zFar=1000;
-  if (this->octree)
-  {
-    float maxdim=octree->world_box.maxsize();;
-    zNear = maxdim / 50.0f ;
-    zFar  = maxdim * 10;
-  }
+
+  Box3f world_box=getWorldBox();
+  float maxdim=world_box.maxsize();;
+  zNear = maxdim / 50.0f ;
+  zFar  = maxdim * 10;
 
   frustum->projection_matrix=Mat4f::perspective(DEFAULT_FOV,width/(float)height,zNear,zFar);
   this->redisplay();
@@ -1001,15 +846,12 @@ void GLCanvas::onResize(int width,int height)
 
 
 ///////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////
-void GLCanvas::renderBatch(SmartPointer<Batch> _batch)
+void GLCanvas::renderBatch(SmartPointer<Batch> _batch,int first,int last)
 {
   if (!_batch)
     return;
 
-  juce::OpenGLContext* context=native->getContext();
-
-#define BUFFER_OFFSET(_delta_)  ((char *)NULL + _delta_)
+  juce::OpenGLContext* context=pimpl->getGLContext();
 
   //reset Error
   glGetError();
@@ -1036,123 +878,64 @@ void GLCanvas::renderBatch(SmartPointer<Batch> _batch)
   //vertices
   if (batch.vertices)
   {
-    if (!batch.vertices->gpu) 
-      GLCanvas::Native::createArrayBuffer(batch.vertices);
-
-    if (batch.vertices->gpu)
-    {
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.vertices->gpu->id);
-      glVertexPointer(3, GL_FLOAT, 0, BUFFER_OFFSET(0));
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-    else
-    {
-      glVertexPointer(3, GL_FLOAT, 0, batch.vertices->c_ptr());
-    }
+    batch.vertices->uploadIfNeeded(*this);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.vertices->gpu->id);
+    glVertexPointer(3, GL_FLOAT, 0, nullptr);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
     glEnableClientState(GL_VERTEX_ARRAY);
   }
 
   //normals
   if (batch.normals)
   {
-    if (!batch.normals->gpu)  
-      GLCanvas::Native::createArrayBuffer(batch.normals);
-
-    if (batch.normals->gpu)
-    {
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.normals->gpu->id);
-      glNormalPointer (GL_FLOAT, 0, BUFFER_OFFSET(0));
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-    else
-    {
-      glNormalPointer (GL_FLOAT, 0, batch.normals->c_ptr());
-    }
-
+    batch.normals->uploadIfNeeded(*this);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.normals->gpu->id);
+    glNormalPointer (GL_FLOAT, 0, nullptr);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
     glEnableClientState(GL_NORMAL_ARRAY);
   }
 
   //colors
   if (batch.colors)
   {
-    if (!batch.colors->gpu)  
-      GLCanvas::Native::createArrayBuffer(batch.colors);
-
-    if (batch.colors->gpu)
-    {
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.colors->gpu->id);
-      glColorPointer(3,GL_FLOAT, 0, BUFFER_OFFSET(0));
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-    else
-      glColorPointer(3,GL_FLOAT, 0, batch.colors->c_ptr());
-
+    batch.colors->uploadIfNeeded(*this);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.colors->gpu->id);
+    glColorPointer(3,GL_FLOAT, 0, nullptr);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
     glEnableClientState(GL_COLOR_ARRAY);
     glEnable(GL_COLOR_MATERIAL);
   }
 
-  //texture0
+  //texture0 (seems to be affected by the current color, since I normally use materials I do not care really)
   if (batch.texture0 && batch.texture0coords)
   {
-    //seems to be affected by the current color, since I normally use materials I do not care really
+    batch.texture0->uploadIfNeeded(*this);
+    batch.texture0coords->uploadIfNeeded(*this);
     glColor4f(1,1,1,1);
-
-    //need generation
-    if (!batch.texture0->gpu) 
-      GLCanvas::Native::createTexture(batch.texture0);
-
-    if (!batch.texture0coords->gpu) 
-      GLCanvas::Native::createArrayBuffer(batch.texture0coords);
-
-    context->extensions.glActiveTexture       (GL_TEXTURE0);
-    context->extensions.glClientActiveTexture (GL_TEXTURE0);
-    glBindTexture         (GL_TEXTURE_2D, batch.texture0->gpu->id);
+    context->extensions.glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, batch.texture0->gpu->id);
     glEnable(GL_TEXTURE_2D);
-
-    if (batch.texture0coords->gpu)
-    {
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.texture0coords->gpu->id);
-      glTexCoordPointer (2, GL_FLOAT, 0,  BUFFER_OFFSET(0));
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-    else
-      glTexCoordPointer (2, GL_FLOAT, 0,  batch.texture0coords->c_ptr());
-
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.texture0coords->gpu->id);
+    glTexCoordPointer(2, GL_FLOAT, 0,  nullptr);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
   }
 
-
-  //texture1
+  //texture1 (pre-lighting is calculated I do not need OpenGL lighting)
   if (batch.texture1 && batch.texture1coords)
   {
-    //importante, se pre-lighting is calculated I do not need OpenGL lighting
+    batch.texture1->uploadIfNeeded(*this);
+    batch.texture1coords->uploadIfNeeded(*this);
     glDisable(GL_LIGHTING);
     glColor3f(1,1,1);
-
-    if (!batch.texture1->gpu) 
-      GLCanvas::Native::createTexture(batch.texture1);
-
-    if (!batch.texture1coords->gpu) 
-      GLCanvas::Native::createArrayBuffer(batch.texture1coords);
-
-    context->extensions.glActiveTexture       (GL_TEXTURE1);
-    context->extensions.glClientActiveTexture (GL_TEXTURE1);
-    glBindTexture         (GL_TEXTURE_2D, batch.texture1->gpu->id);
+    context->extensions.glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, batch.texture1->gpu->id);
     glEnable(GL_TEXTURE_2D);
-
-    if (batch.texture1coords->gpu)
-    {
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.texture1coords->gpu->id);
-      glTexCoordPointer (2, GL_FLOAT, 0,  BUFFER_OFFSET(0));
-      context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
-    }
-    else
-      glTexCoordPointer (2, GL_FLOAT, 0,  batch.texture1coords->c_ptr());
-
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, batch.texture1coords->gpu->id);
+    glTexCoordPointer (2, GL_FLOAT, 0,  nullptr);
+    context->extensions.glBindBuffer(GL_ARRAY_BUFFER, 0);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-
-    context->extensions.glActiveTexture       (GL_TEXTURE0);
-    context->extensions.glClientActiveTexture (GL_TEXTURE0);
+    context->extensions.glActiveTexture(GL_TEXTURE0);
   }
 
   //draw the primitives
@@ -1168,7 +951,13 @@ void GLCanvas::renderBatch(SmartPointer<Batch> _batch)
     glMultMatrixf(_m);
 
     int num_vertices=batch.vertices->size()/3;
-    glDrawArrays(batch.primitive, 0, num_vertices);
+
+    if (last==-1)
+      last=num_vertices;
+
+    setLineWidth(batch_line_width);
+    glDrawArrays(batch.primitive, first, last);
+    setLineWidth(1);
   }
   glPopMatrix();
 
@@ -1181,18 +970,15 @@ void GLCanvas::renderBatch(SmartPointer<Batch> _batch)
   if (batch.texture1 && batch.texture1coords)
   {
     context->extensions.glActiveTexture(GL_TEXTURE1);
-    context->extensions.glClientActiveTexture(GL_TEXTURE1);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glDisable(GL_TEXTURE_2D);
     glEnable(GL_LIGHTING);
     context->extensions.glActiveTexture(GL_TEXTURE0);
-    context->extensions.glClientActiveTexture(GL_TEXTURE0);
   }
 
   if (batch.texture0 && batch.texture0coords)
   {
     context->extensions.glActiveTexture(GL_TEXTURE0);
-    context->extensions.glClientActiveTexture(GL_TEXTURE0);
     glDisableClientState(GL_TEXTURE_COORD_ARRAY);
     glDisable(GL_TEXTURE_2D);
   }
@@ -1212,14 +998,64 @@ void GLCanvas::renderBatch(SmartPointer<Batch> _batch)
   {
     glDisableClientState(GL_VERTEX_ARRAY);
   }
-
-#undef BUFFER_OFFSET
 }
 
+///////////////////////////////////////////////////////////////////////////////
+void GLCanvas::renderModel()
+{
+  if (!this->octree)
+    return;
 
+  std::vector<SmartPointer<Batch> > transparent;
+  SmartPointer<Frustum> frustum=debug_frustum?debug_frustum:this->frustum;
+  FrustumIterator it_frustum=this->octree->find(frustum);
+  Clock t1;
+  bool bQuitRenderingLoop=false;
+  for (;!bQuitRenderingLoop && !it_frustum.end();it_frustum.moveNext())
+  {
+    OctreeNode* node=it_frustum.getNode();
+    std::vector<SmartPointer<Batch> >& v=node->batches;
+
+    for (int i=0;!bQuitRenderingLoop && i<(int)v.size();i++) 
+    {
+      if (frustum->intersect(v[i]->getBox()))
+      {
+        if (v[i]->diffuse.a<1)
+        {
+          transparent.push_back(v[i]);
+        }
+        else
+        {
+          renderBatch(v[i]);
+
+          if (this->draw_lines && v[i]->primitive>=Batch::TRIANGLES)
+          {
+            setDepthWrite(false);
+            setLineWidth(batch_line_width);
+            setPolygonMode(Batch::LINES);
+            Color4f ambient=v[i]->ambient;
+            Color4f diffuse=v[i]->diffuse;
+            v[i]->setColor(Color4f(0,0,0,0.05f));
+            renderBatch(v[i]);
+            v[i]->ambient=ambient;
+            v[i]->diffuse=diffuse;
+            setDepthWrite(true);
+            setPolygonMode(Batch::POLYGON);
+            setLineWidth(1);
+          }
+        }
+      }	
+    }
+  }
+
+  //draw transparent object in reverse order
+  for (int i=(transparent.size()-1);!bQuitRenderingLoop && i>=0 ;i--)
+    renderBatch(transparent[i]);
+
+}
 
 ///////////////////////////////////////////////////////////////////////////////
-void GLCanvas::renderScene()
+void GLCanvas::renderOpenGL()
 {
   clearScreen();
   setViewport(frustum->x,frustum->y,frustum->width,frustum->height);
@@ -1246,74 +1082,7 @@ void GLCanvas::renderScene()
     setLineWidth(1);
   }
 
-  if (this->octree)
-  {
-    std::vector<SmartPointer<Batch> > transparent;
-    SmartPointer<Frustum> frustum=debug_frustum?debug_frustum:this->frustum;
-    FrustumIterator it_frustum=this->octree->find(frustum);
-    Clock t1;
-    bool bQuitRenderingLoop=false;
-    for (;!bQuitRenderingLoop && !it_frustum.end();it_frustum.moveNext())
-    {
-      OctreeNode* node=it_frustum.getNode();
-      std::vector<SmartPointer<Batch> >& v=node->batches;
-
-      for (int i=0;!bQuitRenderingLoop && i<(int)v.size();i++) 
-      {
-        if (frustum->intersect(v[i]->getBox()))
-        {
-          if (v[i]->diffuse.a<1)
-          {
-            transparent.push_back(v[i]);
-          }
-          else
-          {
-            renderBatch(v[i]);
-
-            if (this->draw_lines && v[i]->primitive>=Batch::TRIANGLES)
-            {
-              setDepthWrite(false);
-              setLineWidth(2);
-              setPolygonMode(Batch::LINES);
-              Color4f ambient=v[i]->ambient;
-              Color4f diffuse=v[i]->diffuse;
-              v[i]->setColor(Color4f(0,0,0,0.05f));
-              renderBatch(v[i]);
-              v[i]->ambient=ambient;
-              v[i]->diffuse=diffuse;
-              setDepthWrite(true);
-              setPolygonMode(Batch::POLYGON);
-              setLineWidth(2);
-            }
-
-            //draw in chunks of fps=30
-            /*if (bProgressiveRendering && t1.msec()>30) 
-            {
-              t1.reset();
-              bQuitRenderingLoop=m_redisplay;
-              swapBuffers();
-            }*/
-          }
-        }	
-      }
-    }
-
-    //draw transparent object in reverse order
-    for (int i=(transparent.size()-1);!bQuitRenderingLoop && i>=0 ;i--)
-    {
-      renderBatch(transparent[i]);
-
-      //draw in chunks of fps=30
-      //if (bProgressiveRendering && t1.msec()>30) 
-      //{
-      //  t1.reset();
-      //  bQuitRenderingLoop=m_redisplay; 
-      //  swapBuffers();
-      //}
-    }
-  }
-
-  swapBuffers();
+  renderModel();
 }
 
 

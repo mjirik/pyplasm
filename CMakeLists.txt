@@ -7,8 +7,6 @@ PROJECT(PyPlasm)
 
 SET(CMAKE_BUILD_TYPE "Release")
 
-
-
 # some basic tests 
 INCLUDE(CMakeBackwardCompatibilityCXX)
 INCLUDE(CheckCSourceCompiles)
@@ -20,6 +18,9 @@ SET_PROPERTY(GLOBAL PROPERTY USE_FOLDERS On)
 SET (CMAKE_NUM_PROCS 8)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} ${CMAKE_CURRENT_SOURCE_DIR})
+
+# problems checking python version number in Anaconda
+SET(PYTHON_REQUIRED_VERSION)
 
 ####################################################
 # platform
@@ -41,6 +42,7 @@ ELSEIF (APPLE)
   ADD_DEFINITIONS(-DPYPLASM_APPLE=1)
   
   SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wformat-nonliteral -Wformat-security -Wno-write-strings -Wno-reorder -Wno-unused-variable")
+  set(CMAKE_MACOSX_RPATH ON)
   MESSAGE("-- Setting PYPLASM_APPLE")
   
 ELSE()
@@ -86,6 +88,7 @@ ELSE()
 
 ENDIF()
 
+ADD_DEFINITIONS(-DPYPLASM_JUCE=1)
 ADD_SUBDIRECTORY(libs)
 ADD_SUBDIRECTORY(src)
 

@@ -23,7 +23,7 @@ Install prerequisites::
 		libxcursor-dev swig libglu1-mesa-dev libfreeimage3 libglew1.10 libpng12-0 \
 		libpng12-dev libjpeg-dev libxxf86vm1 libxxf86vm-dev libxi6 libxi-dev \
 		libxrandr-dev mesa-common-dev mesa-utils-extra libgl1-mesa-dev libglapi-mesa \
-		python-numpy python-scipy
+		python-numpy python-scipy libldap2-dev
 
 	sudo apt-get install $PREREQUISITES # OpenSuse: "sudo zypper install $PREREQUISITES"
 
@@ -49,26 +49,45 @@ Generate makefiles and make binaries::
 -----------------------------------------------------------
 MacOsX compilation 
 -----------------------------------------------------------
-1. Install XCode tools from AppStore (optionally install also Xcode command line tools)
-2. Install brew from http://mxcl.github.com/homebrew/
-3. Install cmake with ``brew install cmake``
-4. Install PyOpenGL with ``sudo easy_install pyopengl``
-5. Install numpy/scipy with ScipySuperpack from http://fonnesbeck.github.com/ScipySuperpack/ (browse the page to find the correct version for your MacOsX)
-6. Generate XCode project , build and install::
 
-	cd /home/$USERNAME/pyplasm
+IMPORTANT: do not install brew since it can cause conflicts with the following installation 
+
+1. Install XCode tools from AppStore (optionally install also Xcode command line tools)
+
+2. Install “Anaconda” for OSX/Python2.7 (NOTE: the python version is important) from
+   the following URL::
+
+         https://www.continuum.io/downloads
+
+3. Install PyOpenGL::
+
+    conda install pyopengl
+
+4. Install cmake for OSX 
+   https://cmake.org/files/v3.6/cmake-3.6.2-Darwin-x86_64.dmg
+
+5. Download pyplasm in your Users directory (example: /Users/$USERNAME/pyplasm)
+   Open a terminal and create the build directory::
+
+	cd /Users/$USERNAME/pyplasm
 	mkdir build
-	cd build
-	cmake -GXcode ../ 
+	
+6. Run Cmake from command line (NOTE make sure the substring 2.7.12-1 is what you have!)::
+
+        cd build
+        
+        /Applications/CMake.app/Contents/bin/cmake ../ \
+             -G Xcode \
+             -DPYTHON_LIBRARY=/Users/$USER/anaconda/pkgs/python-2.7.12-1/lib/libpython2.7.dylib \
+             -DPYTHON_INCLUDE_DIR=/Users/$USER/anaconda/pkgs/python-2.7.12-1/include/python2.7/ \
+             -DPYTHON_EXECUTABLE=/Users/$USER/anaconda/bin/python \
+             -DPYPLASM_REGENERATE_SWIG_WRAPPERS=0        
+
+7. Build and install::
+
+	cd /Users/$USER/pyplasm/build
 	xcodebuild      -project PyPlasm.xcodeproj -target ALL_BUILD  -configuration Release
 	sudo xcodebuild -project PyPlasm.xcodeproj -target install    -configuration Release
-
-**Possible cmake errors**:
-
-If the command ``cmake -GXcode ../`` fails with errors about OPENGL_INCLUDE_DIRS and PYTHON_INCLUDE_DIRS you need to specify it manually:
-for example, in Mac OsX 10.8 the right command line is::
-
-	cmake -GXcode -DOPENGL_INCLUDE_DIR=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.8.sdk/System/Library/Frameworks/OpenGL.framework/Versions/A/Headers -DPYTHON_INCLUDE_DIR=/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX10.8.sdk/System/Library/Frameworks/Python.framework/Versions/2.7/include/python2.7 ../
 
 -----------------------------------------------------------
 Windows 7/8 compilation 
@@ -76,27 +95,20 @@ Windows 7/8 compilation
 
 Install:
 
-- Visual Studio (Express edition is free)
-http://www.microsoft.com/visualstudio/eng/products/visual-studio-express-products
+- Visual Studio 2017 community
 
-- Python 2.7.3 - 32 bit 
-http://www.python.org/ftp/python/2.7.3/python-2.7.3.msi
+- Anaconda Python 2.7.x - 64 bit (downlaod from that page)
+https://www.continuum.io/downloads
 
-- PyOpenGL 3.0.2 - 32 bit
-https://pypi.python.org/packages/any/P/PyOpenGL/PyOpenGL-3.0.2.win32.exe#md5=4f1c66d6d87dcdf98ecc7ff4ce61a7e6
+- Install Python
 
-- numpy 1.7.0 - 32 bit
-http://sourceforge.net/projects/numpy/files/NumPy/1.7.0/numpy-1.7.0-win32-superpack-python2.7.exe/download
+- Using Anaconda navigator install packages
+	- PyOpenGL
+	- numpy
+	- scipy
+	- swig
 
-- SciPy 0.12.0 rc1 - 32 bit
-http://sourceforge.net/projects/scipy/files/scipy/0.12.0rc1/scipy-0.12.0c1-win32-superpack-python2.7.exe/download
-
-- Swig 2.0.9
-http://prdownloads.sourceforge.net/swig/swigwin-2.0.9.zip
-(unzip Swig and move the folder to obtain C:/swigwin-2.0.9)
-
-- Cmake 2.8.10.2 - 32 bit 
-http://www.cmake.org/files/v2.8/cmake-2.8.10.2-win32-x86.exe
+- Cmake 3.x - 32 bit 
 (during the installation select: "Add CMake to the system PATH for all users")
 
 Run cmake-gui::
@@ -107,15 +119,10 @@ Run cmake-gui::
 Press configure::
 
  	"Build directory does not exist..." > Yes
-	"Specify the generator for this project": Visual Studio 11
+	"Specify the generator for this project": Visual Studio 15 2017 Win64
 	Select: "Use default native compilers" 
 	Wait...  "Configuring done"!
 	Select: "Ungrouped Entries" > "PYPLASM_REGENERATE_SWIG_WRAPPERS" and check it
-	
-Press configure again::
-
-	Error
-	Select: "SWIG_EXECUTABLE" > "SWIG_EXECUTABLE-NOTFOUND" and specify: C:/swigwin-2.0.9/swig.exe
 
 Press configure again::
 
@@ -145,9 +152,9 @@ Run Visual Studio::
 Test pyplasm is working
 -----------------------------------------------------------
 
-	python
+Start python or ipython then try::
+
 	from pyplasm import *
 	c=CUBOID([1,1,1])
 	VIEW(c)
 	quit()
-
