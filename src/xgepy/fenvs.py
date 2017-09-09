@@ -1,4 +1,4 @@
-
+from past.builtins import long
 
 import time
 from functools import reduce
