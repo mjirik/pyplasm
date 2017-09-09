@@ -1020,7 +1020,8 @@ def UKPOL (pol):
 	u = StdVectorStdVectorInt()
 	pointdim=Plasm.ukpol(pol, v, u) 
 	points=[]
-	for i in xrange(0, len(v), pointdim):points+=[[v[i] for i in range(i,i+pointdim)]]
+	# for i in xrange(0, len(v), pointdim):points+=[[v[i] for i in range(i,i+pointdim)]]
+	for i in range(0, len(v), pointdim):points+=[[v[i] for i in range(i,i+pointdim)]]
 	hulls=map(lambda x: [i + 1 for i in x], u)
 	pols=[[1]]
 	return  [points, hulls, pols]
@@ -1049,7 +1050,8 @@ def UKPOLF (pol):
 	u = StdVectorStdVectorInt()
 	pointdim=Plasm.ukpolf(pol, f, u) 
 	faces=[]
-	for i in xrange(0, len(f), pointdim+1):
+	# for i in xrange(0, len(f), pointdim+1):
+	for i in range(0, len(f), pointdim+1):
 		faces+=[[f[i] for i in range(i,i+pointdim+1)]]
 	hulls=map(lambda x: [i + 1 for i in x], u)
 	pols=[[1]]
