@@ -269,7 +269,7 @@ def Eq (x,y): return x == y
 
 def EQ(List):
 	for i in List:
-	   if not i==List[0]: return False
+		if not i==List[0]: return False
 	return True
 
 def NEQ(List): 
@@ -447,7 +447,7 @@ def ISSEQOF (type_checker):
 	def ISSEQOF0 (arg):
 		if not isinstance(arg, list): return False
 		for item in arg:
-		   if not type_checker(item): return False
+			if not type_checker(item): return False
 		return True
 	return ISSEQOF0
 
@@ -910,7 +910,7 @@ if __name__ == "__main__":
 def CASE (ListPredFuns):
 	def CASE_NO_CURRIED (ListPredFuns, x):
 		for p in ListPredFuns:
-		   if p[0](x): return p[1](x)
+			if p[0](x): return p[1](x)
 	return lambda arg: CASE_NO_CURRIED(ListPredFuns, arg)
 
 if __name__ == "__main__": 
@@ -1843,12 +1843,12 @@ if __name__ == "__main__":
 # =============================================
 
 def CONE (args):
-	 radius , height = args
-	 def CONE0(N):
+	radius , height = args
+	def CONE0(N):
 		basis = CIRCLE(radius)([N,1])
 		apex = T(3)(height)(SIMPLEX(0))
 		return  JOIN([basis, apex])
-	 return CONE0
+	return CONE0
 
 if __name__ == "__main__":
    assert Plasm.limits(CONE([1.0,3.0])(16)).fuzzyEqual(Boxf(Vecf(1,-1,-1,0),Vecf(1,+1,+1,3)))
