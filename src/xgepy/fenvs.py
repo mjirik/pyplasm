@@ -2,6 +2,7 @@
 
 import time
 from functools import reduce
+from builtins import range
 
 start=time.clock()
 print("Evaluating fenvs.py..")
@@ -689,7 +690,7 @@ if __name__ == "__main__":
 # ===================================================
 
 def INTSTO (n): 
-	return range(1,n+1)
+	return list(range(1,n+1))
 
 
 if __name__ == "__main__": 
@@ -697,7 +698,7 @@ if __name__ == "__main__":
 
 
 def FROMTO (args):   
-	return range(args[0],args[-1]+1)
+	return list(range(args[0],args[-1]+1))
 
 
 if __name__ == "__main__": 
@@ -815,8 +816,8 @@ if __name__ == "__main__":
 	assert(STRING(CHARSEQ('hello'))=='hello')
 
 def RANGE (Pair):
-	if ( (Pair[-1]-Pair[0]) >= 0 ): return range(Pair[0], Pair[-1] + 1)
-	return range(Pair[0], Pair[-1] - 1, -1)
+	if ( (Pair[-1]-Pair[0]) >= 0 ): return list(range(Pair[0], Pair[-1] + 1))
+	return list(range(Pair[0], Pair[-1] - 1, -1))
 
 
 
@@ -3817,7 +3818,7 @@ def SIMPLEXGRID(size):
         model = larSimplexGrid(shape)
         verts,cells = model
         cells = [[v+1 for v in cell] for cell in cells]
-        coords = range(1,len(size)+1)
+        coords = list(range(1,len(size)+1))
         return S(coords)(scaleCoeffs)(MKPOL([verts,cells,None]))
     return model2hpc0
 
