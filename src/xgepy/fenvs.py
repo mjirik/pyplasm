@@ -2,7 +2,7 @@
 
 import time
 from functools import reduce
-from builtins import range
+from builtins import range, map
 
 start=time.clock()
 print("Evaluating fenvs.py..")
@@ -252,7 +252,7 @@ if __name__ == "__main__":
 # ===================================================
 
 def AA (f):
-	def AA0 (args): return map(f, args)
+	def AA0 (args): return list(map(f, args))
 	return AA0
 
 
@@ -470,8 +470,8 @@ def ISODD(N): return not ISEVEN(N)
 if __name__ == "__main__":
 	assert(ISMAT([[1,2],[3,4]])==True and not ISMAT([1,2,3,4]))
 
-def VECTSUM(vects):  return map(sum,zip(*vects))
-def VECTDIFF(vects): return map(lambda l: l[0]-sum(l[1:]),zip(*vects))
+def VECTSUM(vects):  return list(map(sum,zip(*vects)))
+def VECTDIFF(vects): return list(map(lambda l: l[0]-sum(l[1:]),zip(*vects)))
 
 if __name__ == "__main__":
 	assert(VECTDIFF([[10,11,12],[0,1,2],[1,1,1]])==[9,9,9])
@@ -487,7 +487,7 @@ def IS_PLASM_POINT_2D (obj):
 
 def MEANPOINT (points):
 	coeff=1.0/len(points)
-	return map(lambda x:coeff*x,VECTSUM(points))
+	return list(map(lambda x:coeff*x,VECTSUM(points)))
 
 
 if __name__ == "__main__":
@@ -615,7 +615,7 @@ LEN = len
 # ===================================================
 
 def TRANS (List): 
-	return map(list, zip(*List))
+	return list(map(list, zip(*List)))
 
 
 if __name__ == "__main__": 
@@ -997,7 +997,7 @@ if __name__ == "__main__":
 def MKPOL (args_list):
    points, cells, pols = args_list
    dim = len(points[0])
-   return Plasm.mkpol(dim, CAT(points), map(lambda x: [i-1 for i in x], cells),plasm_config.tolerance())
+   return Plasm.mkpol(dim, CAT(points), list(map(lambda x: [i-1 for i in x], cells)),plasm_config.tolerance())
 
 if __name__ == "__main__": 
 	assert(Plasm.limits(MKPOL([  [[0,0],[1,0],[1,1],[0,1]] , [[1,2,3,4]] , None ]))==Boxf(Vecf(1,0,0),Vecf(1,1,1)))
@@ -2424,7 +2424,7 @@ OCTAHEDRON = CROSSPOLYTOPE(2)
 # ===================================================
 
 def MATHOM (M):
-	return [[1] + [0 for i in range(len(M))]] + map(lambda l: [0]+l, M)
+	return [[1] + [0 for i in range(len(M))]] + list(map(lambda l: [0]+l, M))
 
 if __name__ == "__main__":
 	assert MATHOM([[1,2],[3,4]])==[[1,0,0],[0,1,2],[0,3,4]]
@@ -3816,7 +3816,7 @@ def SIMPLEXGRID(size):
     """
     def model2hpc0(shape):
         assert len(shape) == len(size)
-        scaleCoeffs = map(DIV, zip(size,shape))
+        scaleCoeffs = list(map(DIV, zip(size,shape)))
         model = larSimplexGrid(shape)
         verts,cells = model
         cells = [[v+1 for v in cell] for cell in cells]
