@@ -996,7 +996,10 @@ if __name__ == "__main__":
 def MKPOL (args_list):
    points, cells, pols = args_list
    dim = len(points[0])
-   return Plasm.mkpol(dim, CAT(points), map(lambda x: [i-1 for i in x], cells),plasm_config.tolerance())
+   arg3 = map(lambda x: [i-1 for i in x], cells)
+   if type(arg3[0]) != list:
+       arg3 = [arg3]
+   return Plasm.mkpol(dim, CAT(points), arg3,plasm_config.tolerance())
 
 if __name__ == "__main__": 
 	assert(Plasm.limits(MKPOL([  [[0,0],[1,0],[1,1],[0,1]] , [[1,2,3,4]] , None ]))==Boxf(Vecf(1,0,0),Vecf(1,1,1)))
@@ -1914,7 +1917,7 @@ ICOSAHEDRON = build_ICOSAHEDRON()
 # =============================================
 
 def build_TETRAHEDRON():
-	return JOIN([  T(3)(-1.0/3.0)(NGON(3)),  MK([0, 0, 1])  ])
+	return JOIN([  T(3)(-1.0/3.0)(NGON(3)),  MK([0.0, 0.0, 1.0])  ])
 
 TETRAHEDRON = build_TETRAHEDRON()
 
