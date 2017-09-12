@@ -1,8 +1,7 @@
-from past.builtins import long
+from past.builtins import long, map, range, xrange
 
 import time
 from functools import reduce
-from builtins import range, map
 
 start=time.clock()
 print("Evaluating fenvs.py..")
@@ -470,8 +469,8 @@ def ISODD(N): return not ISEVEN(N)
 if __name__ == "__main__":
 	assert(ISMAT([[1,2],[3,4]])==True and not ISMAT([1,2,3,4]))
 
-def VECTSUM(vects):  return list(map(sum,zip(*vects)))
-def VECTDIFF(vects): return list(map(lambda l: l[0]-sum(l[1:]),zip(*vects)))
+def VECTSUM(vects):  return map(sum,zip(*vects))
+def VECTDIFF(vects): return map(lambda l: l[0]-sum(l[1:]),zip(*vects))
 
 if __name__ == "__main__":
 	assert(VECTDIFF([[10,11,12],[0,1,2],[1,1,1]])==[9,9,9])
@@ -487,7 +486,7 @@ def IS_PLASM_POINT_2D (obj):
 
 def MEANPOINT (points):
 	coeff=1.0/len(points)
-	return list(map(lambda x:coeff*x,VECTSUM(points)))
+	return map(lambda x:coeff*x,VECTSUM(points))
 
 
 if __name__ == "__main__":
@@ -615,7 +614,7 @@ LEN = len
 # ===================================================
 
 def TRANS (List): 
-	return list(map(list, zip(*List)))
+	return map(list, zip(*List))
 
 
 if __name__ == "__main__": 
@@ -690,7 +689,7 @@ if __name__ == "__main__":
 # ===================================================
 
 def INTSTO (n): 
-	return list(range(1,n+1))
+	return range(1,n+1)
 
 
 if __name__ == "__main__": 
@@ -698,7 +697,7 @@ if __name__ == "__main__":
 
 
 def FROMTO (args):   
-	return list(range(args[0],args[-1]+1))
+	return range(args[0],args[-1]+1)
 
 
 if __name__ == "__main__": 
@@ -816,8 +815,8 @@ if __name__ == "__main__":
 	assert(STRING(CHARSEQ('hello'))=='hello')
 
 def RANGE (Pair):
-	if ( (Pair[-1]-Pair[0]) >= 0 ): return list(range(Pair[0], Pair[-1] + 1))
-	return list(range(Pair[0], Pair[-1] - 1, -1))
+	if ( (Pair[-1]-Pair[0]) >= 0 ): return range(Pair[0], Pair[-1] + 1)
+	return range(Pair[0], Pair[-1] - 1, -1)
 
 
 
@@ -997,7 +996,7 @@ if __name__ == "__main__":
 def MKPOL (args_list):
    points, cells, pols = args_list
    dim = len(points[0])
-   return Plasm.mkpol(dim, CAT(points), list(map(lambda x: [i-1 for i in x], cells)),plasm_config.tolerance())
+   return Plasm.mkpol(dim, CAT(points), map(lambda x: [i-1 for i in x], cells),plasm_config.tolerance())
 
 if __name__ == "__main__": 
 	assert(Plasm.limits(MKPOL([  [[0,0],[1,0],[1,1],[0,1]] , [[1,2,3,4]] , None ]))==Boxf(Vecf(1,0,0),Vecf(1,1,1)))
@@ -1020,8 +1019,7 @@ def UKPOL (pol):
 	u = StdVectorStdVectorInt()
 	pointdim=Plasm.ukpol(pol, v, u) 
 	points=[]
-	# for i in xrange(0, len(v), pointdim):points+=[[v[i] for i in range(i,i+pointdim)]]
-	for i in range(0, len(v), pointdim):points+=[[v[i] for i in range(i,i+pointdim)]]
+	for i in xrange(0, len(v), pointdim):points+=[[v[i] for i in range(i,i+pointdim)]]
 	hulls=map(lambda x: [i + 1 for i in x], u)
 	pols=[[1]]
 	return  [points, hulls, pols]
@@ -1050,8 +1048,7 @@ def UKPOLF (pol):
 	u = StdVectorStdVectorInt()
 	pointdim=Plasm.ukpolf(pol, f, u) 
 	faces=[]
-	# for i in xrange(0, len(f), pointdim+1):
-	for i in range(0, len(f), pointdim+1):
+	for i in xrange(0, len(f), pointdim+1):
 		faces+=[[f[i] for i in range(i,i+pointdim+1)]]
 	hulls=map(lambda x: [i + 1 for i in x], u)
 	pols=[[1]]
@@ -2424,7 +2421,7 @@ OCTAHEDRON = CROSSPOLYTOPE(2)
 # ===================================================
 
 def MATHOM (M):
-	return [[1] + [0 for i in range(len(M))]] + list(map(lambda l: [0]+l, M))
+	return [[1] + [0 for i in range(len(M))]] + map(lambda l: [0]+l, M)
 
 if __name__ == "__main__":
 	assert MATHOM([[1,2],[3,4]])==[[1,0,0],[0,1,2],[0,3,4]]
@@ -3816,11 +3813,11 @@ def SIMPLEXGRID(size):
     """
     def model2hpc0(shape):
         assert len(shape) == len(size)
-        scaleCoeffs = list(map(DIV, zip(size,shape)))
+        scaleCoeffs = map(DIV, zip(size,shape))
         model = larSimplexGrid(shape)
         verts,cells = model
         cells = [[v+1 for v in cell] for cell in cells]
-        coords = list(range(1,len(size)+1))
+        coords = range(1,len(size)+1)
         return S(coords)(scaleCoeffs)(MKPOL([verts,cells,None]))
     return model2hpc0
 
